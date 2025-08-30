@@ -957,8 +957,6 @@ addLocationBtn.addEventListener('click', async () => {
   }
 });
 
-//----------------
-
   const filterButtons = document.querySelectorAll('.filter-btn');
   filterButtons.forEach(btn => btn.addEventListener('click', (e) => {
     filterButtons.forEach(b => b.classList.remove('bg-gray-400', 'text-white'));
@@ -1157,7 +1155,7 @@ Pega este bloque al FINAL de tu HTML (justo antes de </body>) y elimina cualquie
   }
   function updateTitleBilingual(){
     const t=['header h1','.app-title','#appTitle','h1'].map(s=>document.querySelector(s)).find(Boolean); if(!t) return;
-    const text=' Zizak predicción setas '; t.childNodes.forEach(n=>{ if(n.nodeType===3) n.nodeValue=text; });
+    const text=' 🍄 Zizak - Setas 🌲 '; t.childNodes.forEach(n=>{ if(n.nodeType===3) n.nodeValue=text; });
   }
   function patchDateLocale(lang){
     const native = Date.prototype.toLocaleDateString;
