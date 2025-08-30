@@ -27,7 +27,7 @@
 </head>
 <body class="bg-green-50 min-h-screen p-6 font-sans">
   <header class="text-center mb-8 relative">
-    <h1 class="text-4xl font-extrabold text-green-800 mb-2">🍄 Predicción de Setas en Navarra 🌲</h1>
+    <h1 class="text-4xl font-extrabold text-green-800 mb-2">🍄 Zizak Setas 🌲</h1>
     <p class="text-lg text-gray-600">Probabilidad general y especie más probable según condiciones.</p>
     <button id="help-button" class="absolute top-2 right-2 text-gray-400 hover:text-green-600 text-3xl font-bold leading-none" aria-label="Ayuda">&#9432;</button>
   </header>
@@ -991,8 +991,12 @@ addLocationBtn.addEventListener('click', async () => {
   });
 </script>
 
-<!-- === PARCHE DE IDIOMA v3.7 (CAST / EUSK) === -->
+<!-- === PARCHE DE IDIOMA v3.4 (CAST / EUSK) — FIX: sin falsos reemplazos ("Viedenar", "Lunta") ===
+Pega este bloque al FINAL de tu HTML (justo antes de </body>) y elimina cualquier parche anterior.
+-->
+
 <style>
+  /* Botón pequeño arriba a la izquierda */
   #__langToggle{position:fixed;left:12px;top:12px;z-index:9999}
   #__langToggle button{
     background:#065f46;color:#fff;border-radius:9999px;
@@ -1000,33 +1004,25 @@ addLocationBtn.addEventListener('click', async () => {
     box-shadow:0 4px 12px rgba(0,0,0,.14)
   }
   #__langToggle button:hover{background:#047857}
-  .__title-i18n .shroom{font-size:.95em; margin:0 .25rem}
-  .__title-i18n .dash{opacity:.9; margin:0 .25rem}
-  .__credits{font-size:.85rem;opacity:.8;margin-top:.5rem}
 </style>
 
 <div id="__langToggle" aria-live="polite"><button type="button" id="__langBtn">Euskara</button></div>
 
 <script>
 (function(){
-  const LANG = (function(){
-    let val = localStorage.getItem('app_lang') || localStorage.getItem('lang') || 'es';
-    function set(v){ val=v; localStorage.setItem('app_lang', v); localStorage.setItem('lang', v);
-      document.documentElement.setAttribute('data-lang', v); }
-    function get(){ return val; }
-    return { get, set, toggle(){ set(val==='es'?'eu':'es'); return val; } };
-  })();
-
+  const getLang = ()=> localStorage.getItem('lang') || localStorage.getItem('app_lang') || 'es';
+  const setLang = (l)=>{ localStorage.setItem('lang', l); localStorage.setItem('app_lang', l); };
+  const other = (l)=> l==='es' ? 'eu' : 'es';
   const norm = s=> (s||'').replace(/\s+/g,' ').trim().toLowerCase();
-  const RE_ESC = s=> s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-  const L_BOUND = '[^A-Za-zÁ-Üá-üÑñ]';
-  const repToken = (str, from, to)=> str.replace(new RegExp(`(^|${L_BOUND})(${RE_ESC(from)})(?=$|${L_BOUND})`,'g'), (m,prefix)=> prefix+to);
 
+  // ===== Diccionarios exactos =====
   const EXACT = [
+    // Cabeceras / paneles
     {es:'Parques Micológicos', eu:'Parke Mikologikoak'},
     {es:'Leyenda', eu:'Legenda'},
     {es:'Fase Lunar', eu:'Ilargiaren fasea'},
-    {es:'Consulta la web de:', eu:'Webgunea kontsultatu:'},
+
+    // Búsqueda / ubicaciones
     {es:'Añadir nueva ubicación', eu:'Kokapen berria gehitu'},
     {es:'Añadir ubicación', eu:'Kokapena gehitu'},
     {es:'Ubicación', eu:'Kokapena'},
@@ -1045,6 +1041,8 @@ addLocationBtn.addEventListener('click', async () => {
     {es:'Medio (40–80)', eu:'Ertaina (40–80)'},
     {es:'Joven (<40)', eu:'Gaztea (<40)'},
     {es:'Eliminar', eu:'Ezabatu'},
+
+    // Filtros / ordenación
     {es:'Filtrar por:', eu:'Iragazi honen arabera:'},
     {es:'Filtrar por',  eu:'Iragazi honen arabera'},
     {es:'Ordenar por:', eu:'Ordenatu honen arabera:'},
@@ -1055,6 +1053,8 @@ addLocationBtn.addEventListener('click', async () => {
     {es:'Alta', eu:'Handia'},
     {es:'Media', eu:'Ertaina'},
     {es:'Baja', eu:'Txikia'},
+
+    // Tabla / gráficos
     {es:'Últimos 14 días', eu:'Azken 14 egunak'},
     {es:'Próximos días', eu:'Hurrengo egunak'},
     {es:'Histórico', eu:'Historikoa'},
@@ -1071,10 +1071,14 @@ addLocationBtn.addEventListener('click', async () => {
     {es:'Lluvia', eu:'Euria'},
     {es:'Probabilidad de setas', eu:'Perretxikoen aukera'},
     {es:'% apar. setas', eu:'% perretxiko agerpena'},
+
+    // Ubicaciones
     {es:'Ultzama', eu:'Ultzama'},
     {es:'Selva de Irati', eu:'Iratiko oihana'},
     {es:'Selva Irati', eu:'Iratiko oihana'},
     {es:'Altsasu', eu:'Altsasu'},
+
+    // Especies
     {es:'Boletus gr. edulis', eu:'Ontto zuri taldea'},
     {es:'Cantharellus cibarius', eu:'Ziza hori'},
     {es:'Níscalos (Lactarius gr. deliciosus)', eu:'Esne-perretxikoak (Lactarius gr. deliciosus)'},
@@ -1083,9 +1087,11 @@ addLocationBtn.addEventListener('click', async () => {
     {es:'Pleurotus eryngii', eu:'Kardu-ziza'}
   ];
 
+  // Fragmentos y etiquetas variables
   const PARTS = [
     { es:'Próxima luna llena', eu:'Hurrengo ilargi betea' },
     { es:'Previsión para 7 días:', eu:'7 egunetarako aurreikuspena:' },
+    // Motivos del desglose
     { es:'Suelo húmedo', eu:'Lurra hezea' },
     { es:'Brote tras lluvia reciente', eu:'Euri ondorengo agerpena' },
     { es:'Temp. óptima', eu:'Tenperatura egokia' },
@@ -1101,34 +1107,33 @@ addLocationBtn.addEventListener('click', async () => {
     { es:'Viento fuerte', eu:'Haize bortitza' }
   ];
 
+  // Días abreviados y meses — AHORA con límites de palabra para evitar "Viedenar" y "Lunta"
   const DAYS_ABBR = [['Lun','Al'],['Mar','Ar'],['Mié','Az'],['Jue','Og'],['Vie','Or'],['Sáb','Lr'],['Dom','Ig']];
   const MONTHS = [
     ['enero','urtarrila'],['febrero','otsaila'],['marzo','martxoa'],['abril','apirila'],['mayo','maiatza'],['junio','ekaina'],
     ['julio','uztaila'],['agosto','abuztua'],['septiembre','iraila'],['octubre','urria'],['noviembre','azaroa'],['diciembre','abendua']
   ];
-  const MONTHS_SHORT = [
-    ['ene','urt'],['feb','ots'],['mar','mar'],['abr','api'],['may','mai'],['jun','eka'],
-    ['jul','uzt'],['ago','abu'],['sept','ira'],['oct','urr'],['nov','aza'],['dic','abe']
-  ];
+  const RE_ESC = s=> s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const L_BOUND = '[^A-Za-zÁ-Üá-üÑñ]';
+  const repToken = (str, from, to)=> str.replace(new RegExp(`(^|${L_BOUND})(${RE_ESC(from)})(?=$|${L_BOUND})`,'g'), ($0,$1)=> $1+to);
 
+  // === Utilidades de traducción ===
   function trExact(str, lang){
-    let s = norm(str);
-    if(s.includes('consulta los partes de setas que publican los parques')){
-      str = str.replace(/consulta los partes de setas que publican los parques/ig,'Consulta la web de:');
-      s = norm(str);
-    }
+    const s = norm(str);
     for(const p of EXACT){ if(lang==='eu' && s===norm(p.es)) return p.eu; if(lang==='es' && s===norm(p.eu)) return p.es; }
     return null;
   }
   function trFragments(str, lang){
     let out = str || '';
+    // Frases parciales
     for(const p of PARTS){ out = (lang==='eu') ? out.replaceAll(p.es, p.eu) : out.replaceAll(p.eu, p.es); }
+    // Días abreviados con límites
     for(const [es,eu] of DAYS_ABBR){ out = (lang==='eu') ? repToken(out, es, eu) : repToken(out, eu, es); }
-    const Cap = s=> s.charAt(0).toUpperCase()+s.slice(1);
-    for(const [es,eu] of MONTHS){ out = (lang==='eu') ? repToken(repToken(out, es, eu), Cap(es), Cap(eu)) : repToken(repToken(out, eu, es), Cap(eu), Cap(es)); }
-    for(const [es,eu] of MONTHS_SHORT){
-      out = (lang==='eu') ? repToken(out, es, eu) : repToken(out, eu, es);
-      out = (lang==='eu') ? repToken(out, es+'.', eu+'.') : repToken(out, eu+'.', es+'.');
+    // Meses (minúscula/capitalizada) con límites
+    for(const [es,eu] of MONTHS){
+      const Cap = s=> s.charAt(0).toUpperCase()+s.slice(1);
+      out = (lang==='eu') ? repToken(repToken(out, es, eu), Cap(es), Cap(eu))
+                          : repToken(repToken(out, eu, es), Cap(eu), Cap(es));
     }
     return out;
   }
@@ -1152,7 +1157,7 @@ addLocationBtn.addEventListener('click', async () => {
   }
   function updateTitleBilingual(){
     const t=['header h1','.app-title','#appTitle','h1'].map(s=>document.querySelector(s)).find(Boolean); if(!t) return;
-    t.innerHTML = '<span class="__title-i18n"><span class="shroom" aria-hidden="true">🍄</span> Zizak <span class="dash">–</span> Setas <span class="shroom" aria-hidden="true">🍄</span></span>';
+    const text=' Zizak predicción setas '; t.childNodes.forEach(n=>{ if(n.nodeType===3) n.nodeValue=text; });
   }
   function patchDateLocale(lang){
     const native = Date.prototype.toLocaleDateString;
@@ -1160,90 +1165,47 @@ addLocationBtn.addEventListener('click', async () => {
   }
   function translateProbBadges(lang){
     document.querySelectorAll('.prob-badge, .badge, .chip, .pill, [data-prob-label]').forEach(el=>{
-      let v=(el.getAttribute('data-prob-label')||el.textContent||'').trim(); if(!v) return;
-      v=v.replace('Handia','Alta').replace('Ertaina','Media').replace('Txikia','Baja'); el.setAttribute('data-prob-label',v);
+      let v=(el.getAttribute('data-prob-label')||el.textContent||'').trim(); if(!v) return; v=v.replace('Handia','Alta').replace('Ertaina','Media').replace('Txikia','Baja'); el.setAttribute('data-prob-label',v);
       el.textContent = (lang==='eu') ? v.replace('Alta','Handia').replace('Media','Ertaina').replace('Baja','Txikia') : v;
     });
   }
 
-  // Plugin Chart.js: aplica idioma en CADA actualización (evita “rebotes”)
-  function makeChartPlugin(){
-    if(!window.Chart) return null;
-    const mapStr = (s,lang)=>{ const ex=trExact(s,lang); return ex!==null?ex:trFragments(s,lang); };
-    return {
-      id: 'i18n_mushrooms',
-      beforeInit(chart){ const lang = LANG.get(); applyToChart(chart, lang, mapStr); },
-      beforeUpdate(chart){ const lang = LANG.get(); applyToChart(chart, lang, mapStr); },
-      afterUpdate(chart){ /* no-op */ },
-    };
-    function applyToChart(chart, lang, mapper){
+  // Chart.js: títulos, leyendas y ticks, usando reemplazo con límites
+  function translateCharts(lang){
+    if(!window.Chart) return;
+    const inst = (Chart.instances || Chart._instances || []);
+    const charts = Array.isArray(inst) ? inst : Object.values(inst);
+    const mapStr = (s)=>{ const ex=trExact(s,lang); return ex!==null?ex:trFragments(s,lang); };
+    charts.forEach(ch=>{
       try{
-        chart.data?.datasets?.forEach(ds=>{ if(typeof ds.label==='string') ds.label = mapper(ds.label, lang); });
-        const sc = chart.options?.scales; if(sc){ Object.values(sc).forEach(ax=>{
-          if(ax?.title?.text) ax.title.text = mapper(ax.title.text, lang);
-          if(ax?.ticks){
-            const prev=ax.ticks.callback;
-            ax.ticks.callback = function(v,i,t){ const base = prev? prev.call(this,v,i,t): (''+v); return mapper(base, lang); };
-          }
-        }); }
+        ch.data?.datasets?.forEach(ds=>{ if(typeof ds.label==='string') ds.label = mapStr(ds.label); });
+        const sc = ch.options?.scales; if(sc){ Object.values(sc).forEach(ax=>{ if(ax?.title?.text) ax.title.text = mapStr(ax.title.text); if(ax?.ticks){ const prev=ax.ticks.callback; ax.ticks.callback=function(v,i,t){ const base = prev? prev.call(this,v,i,t): (''+v); return mapStr(base); }; } }); }
+        ch.update('none');
       }catch(e){}
-    }
-  }
-
-  // Bienvenida / Ayuda / Créditos
-  function translateWelcomeAndHelp(lang){
-    const welcome = document.querySelector('#welcome, .welcome, #welcome-message, .toast, .modal .modal-body');
-    if(welcome){
-      const esMsg = '¡Bienvenido! Usa el selector de idioma y explora la predicción por ubicaciones. Añade tus lugares y consulta parques y fases de la luna.';
-      const euMsg = 'Ongi etorri! Hautatu hizkuntza eta esploratu kokapenen araberako iragarpena. Gehitu zure lekuak eta kontsultatu parkeak eta ilargiaren faseak.';
-      welcome.textContent = (lang==='eu') ? euMsg : esMsg;
-    }
-    const helpRoot = document.querySelector('#help, #help-panel, #helpModal .modal-body, .help, .help-content, aside .help');
-    if(helpRoot){
-      const h = helpRoot.querySelector('h1, h2, h3, summary');
-      if(h){ if(lang==='eu'){ if(/ayuda/i.test(h.textContent)) h.textContent='Laguntza'; } else { if(/laguntza/i.test(h.textContent)) h.textContent='Ayuda'; } }
-      if(!helpRoot.querySelector('.__credits')){
-        const p = document.createElement('p'); p.className='__credits';
-        p.textContent = (lang==='eu')
-          ? 'Aplikazioa Amilibia-k sortua, Experto en Micología (IA laguntzailea)ren lankidetzarekin.'
-          : 'Aplicación creada por Amilibia con la colaboración de Experto en Micología (asistente IA).';
-        helpRoot.appendChild(p);
-      }
-    }
+    });
   }
 
   function applyLanguage(lang){
-    document.documentElement.setAttribute('data-lang', lang);
     updateTitleBilingual();
     walkAndTranslate(document.body, lang);
     translateOptions(lang);
     translateAttrs(lang);
     translateProbBadges(lang);
     patchDateLocale(lang);
-    translateWelcomeAndHelp(lang);
+    translateCharts(lang);
     const btn=document.getElementById('__langBtn'); if(btn) btn.textContent=(lang==='eu'?'Castellano':'Euskara');
-    if(window.Chart){ try{ window.Chart.update(); }catch(e){} }
+    setTimeout(()=>translateCharts(lang),150);
+    setTimeout(()=>translateCharts(lang),500);
   }
 
-  function bindToggle(){
-    const handler = ()=>{ const next = LANG.get()==='es'?'eu':'es'; LANG.set(next); applyLanguage(next);
-      if(window.Chart?.registry && !window.__chartI18NReg){ try{ const pl=makeChartPlugin(); if(pl){ Chart.register(pl); window.__chartI18NReg=true; } }catch(e){} } };
-    const btn = document.getElementById('__langBtn');
-    if(btn){ btn.onclick=null; btn.addEventListener('click', handler); }
-    document.addEventListener('click', (e)=>{ if(e.target && e.target.id==='__langBtn') handler(); }, {passive:true});
-  }
+  document.getElementById('__langBtn')?.addEventListener('click', ()=>{
+    const next = other(getLang()); setLang(next); applyLanguage(next);
+  });
 
-  const mo = new MutationObserver(()=>{ if(window.__i18nTick) return; window.__i18nTick = true;
-    requestAnimationFrame(()=>{ window.__i18nTick=false; applyLanguage(LANG.get()); }); });
-  mo.observe(document.body, {childList:true, subtree:true});
-
-  if(window.Chart?.registry && !window.__chartI18NReg){ try{ const pl=makeChartPlugin(); if(pl){ Chart.register(pl); window.__chartI18NReg=true; } }catch(e){} }
-
-  bindToggle();
-  applyLanguage(LANG.get());
+  applyLanguage(getLang());
 })();
 </script>
-<!-- === FIN PARCHE DE IDIOMA v3.7 === -->
+<!-- === FIN PARCHE DE IDIOMA v3.4 === -->
 
 
 
