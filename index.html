@@ -27,7 +27,7 @@
 </head>
 <body class="bg-green-50 min-h-screen p-6 font-sans">
   <header class="text-center mb-8 relative">
-    <h1 class="text-4xl font-extrabold text-green-800 mb-2">🍄 Zizak Setas 🌲</h1>
+    <h1 class="text-4xl font-extrabold text-green-800 mb-2">🍄 Predicción de Setas en Navarra 🌲</h1>
     <p class="text-lg text-gray-600">Probabilidad general y especie más probable según condiciones.</p>
     <button id="help-button" class="absolute top-2 right-2 text-gray-400 hover:text-green-600 text-3xl font-bold leading-none" aria-label="Ayuda">&#9432;</button>
   </header>
@@ -290,39 +290,6 @@
       }
       showNotification('Error al obtener datos meteorológicos.', 'error');
       throw e;
-    }
-  }
-/*
-  async function fetchAltitude(lat, lon) {
-    try {
-      const url = `${OPENTOPO_API_URL}?locations=${lat},${lon}`;
-      const r = await fetch(url);
-      const d = await r.json();
-      return d.results[0].elevation || null;
-    } catch (e) {
-      console.warn('Altitud KO', e);
-      return null;
-    }
-  } */
-
-// OJO Altitud
-// Si prefieres, mientras pruebas, desactiva del todo la altitud añadiendo al principio:
-  window.fetchAltitude = async ()=> null;
-
-
-
-  // Sustituye tu fetchAltitude por este
-  async function fetchAltitude(lat, lon){
-    try{
-      const url = `https://api.opentopodata.org/v1/aster30m?locations=${lat},${lon}`;
-      const res = await fetch(url, {mode:'cors', cache:'no-store'});
-      // Si la API no permite CORS desde file://, esto lanzará al entrar al .json()
-      const json = await res.json();
-      const h = json?.results?.[0]?.elevation;
-      return Number.isFinite(h) ? h : null;
-    }catch(err){
-      console.warn('Altitud KO (continuamos sin altitud)', err);
-      return null; // ¡clave! devolvemos null para que Promise.all no reviente
     }
   }
 
@@ -957,6 +924,8 @@ addLocationBtn.addEventListener('click', async () => {
   }
 });
 
+//----------------
+
   const filterButtons = document.querySelectorAll('.filter-btn');
   filterButtons.forEach(btn => btn.addEventListener('click', (e) => {
     filterButtons.forEach(b => b.classList.remove('bg-gray-400', 'text-white'));
@@ -989,221 +958,304 @@ addLocationBtn.addEventListener('click', async () => {
   });
 </script>
 
-<!-- === PARCHE DE IDIOMA v3.4 (CAST / EUSK) — FIX: sin falsos reemplazos ("Viedenar", "Lunta") ===
-Pega este bloque al FINAL de tu HTML (justo antes de </body>) y elimina cualquier parche anterior.
--->
 
+<!-- === PARCHE DE IDIOMA v4.2 (CAST / EUSK) — STANDALONE === -->
 <style>
-  /* Botón pequeño arriba a la izquierda */
   #__langToggle{position:fixed;left:12px;top:12px;z-index:9999}
   #__langToggle button{
     background:#065f46;color:#fff;border-radius:9999px;
     padding:.3rem .6rem;font-weight:600;font-size:.85rem;
-    box-shadow:0 4px 12px rgba(0,0,0,.14)
+    box-shadow:0 4px 12px rgba(0,0,0,.14);border:0;cursor:pointer
   }
   #__langToggle button:hover{background:#047857}
+  .__title-i18n .shroom{font-size:.95em;margin:0 .25rem}
+  .__title-i18n .dash{opacity:.9;margin:0 .25rem}
+  .__credits{font-size:.85rem;opacity:.8;margin-top:.5rem}
 </style>
-
-<div id="__langToggle" aria-live="polite"><button type="button" id="__langBtn">Euskara</button></div>
-
 <script>
 (function(){
-  const getLang = ()=> localStorage.getItem('lang') || localStorage.getItem('app_lang') || 'es';
-  const setLang = (l)=>{ localStorage.setItem('lang', l); localStorage.setItem('app_lang', l); };
-  const other = (l)=> l==='es' ? 'eu' : 'es';
-  const norm = s=> (s||'').replace(/\s+/g,' ').trim().toLowerCase();
+  // ===== Estado del idioma =====
+  const I18N={get(){return localStorage.getItem('app_lang')||localStorage.getItem('lang')||'es';},
+              set(v){const val=(v==='eu')?'eu':'es';localStorage.setItem('app_lang',val);localStorage.setItem('lang',val);
+                      document.documentElement.setAttribute('data-lang',val);return val;}};
+  window.__getLang=()=>I18N.get();
 
-  // ===== Diccionarios exactos =====
-  const EXACT = [
-    // Cabeceras / paneles
-    {es:'Parques Micológicos', eu:'Parke Mikologikoak'},
-    {es:'Leyenda', eu:'Legenda'},
-    {es:'Fase Lunar', eu:'Ilargiaren fasea'},
+  // ===== Utilidades =====
+  const norm=s=>(s||'').replace(/\s+/g,' ').trim().toLowerCase();
+  const RE_ESC=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const L_BOUND='[^A-Za-zÁ-Üá-üÑñ]';
+  const repToken=(str,from,to)=>str.replace(new RegExp(`(^|${L_BOUND})(${RE_ESC(from)})(?=$|${L_BOUND})`,'g'),(m,p)=>p+to);
 
-    // Búsqueda / ubicaciones
-    {es:'Añadir nueva ubicación', eu:'Kokapen berria gehitu'},
-    {es:'Añadir ubicación', eu:'Kokapena gehitu'},
-    {es:'Ubicación', eu:'Kokapena'},
-    {es:'Buscar', eu:'Bilatu'},
-    {es:'Opciones de hábitat (opcional)', eu:'Habitat aukerak (aukerakoa)'},
-    {es:'Tipo de hábitat', eu:'Habitata'},
-    {es:'Edad del arbolado', eu:'Basoko adina'},
-    {es:'Suelo', eu:'Lurra'},
-    {es:'(sin especificar)', eu:'(zehaztu gabe)'},
-    {es:'Hayedo', eu:'Pagoa'},
-    {es:'Robledal atlántico', eu:'Harizti atlantikoa'},
-    {es:'Pinar de pino silvestre', eu:'Pinu gorrien basoa'},
-    {es:'Carrascal', eu:'Artadi'},
-    {es:'Mixto caducifolio', eu:'Hostogalkor mistoa'},
-    {es:'Maduro (>80 años)', eu:'Zaharra (>80 urte)'},
-    {es:'Medio (40–80)', eu:'Ertaina (40–80)'},
-    {es:'Joven (<40)', eu:'Gaztea (<40)'},
-    {es:'Eliminar', eu:'Ezabatu'},
+  const EXACT=[{es:'Parques Micológicos',eu:'Parke Mikologikoak'},{es:'Leyenda',eu:'Legenda'},{es:'Fase Lunar',eu:'Ilargiaren fasea'},
+    {es:'Consulta la web de:',eu:'Webgunea kontsultatu:'},{es:'Añadir nueva ubicación',eu:'Kokapen berria gehitu'},
+    {es:'Añadir ubicación',eu:'Kokapena gehitu'},{es:'Ubicación',eu:'Kokapena'},{es:'Buscar',eu:'Bilatu'},
+    {es:'Opciones de hábitat (opcional)',eu:'Habitat aukerak (aukerakoa)'},{es:'Tipo de hábitat',eu:'Habitata'},
+    {es:'Edad del arbolado',eu:'Basoko adina'},{es:'Suelo',eu:'Lurra'},{es:'(sin especificar)',eu:'(zehaztu gabe)'},
+    {es:'Hayedo',eu:'Pagoa'},{es:'Robledal atlántico',eu:'Harizti atlantikoa'},{es:'Pinar de pino silvestre',eu:'Pinu gorrien basoa'},
+    {es:'Carrascal',eu:'Artadi'},{es:'Mixto caducifolio',eu:'Hostogalkor mistoa'},
+    {es:'Maduro (>80 años)',eu:'Zaharra (>80 urte)'},{es:'Medio (40–80)',eu:'Ertaina (40–80)'},{es:'Joven (<40)',eu:'Gaztea (<40)'},
+    {es:'Eliminar',eu:'Ezabatu'},{es:'Filtrar por:',eu:'Iragazi honen arabera:'},{es:'Filtrar por',eu:'Iragazi honen arabera'},
+    {es:'Ordenar por:',eu:'Ordenatu honen arabera:'},{es:'Ordenar por',eu:'Ordenatu honen arabera'},
+    {es:'Nombre',eu:'Izena'},{es:'Probabilidad',eu:'Aukera'},{es:'Todas',eu:'Guztiak'},{es:'Alta',eu:'Handia'},{es:'Media',eu:'Ertaina'},{es:'Baja',eu:'Txikia'},
+    {es:'Últimos 14 días',eu:'Azken 14 egunak'},{es:'Próximos días',eu:'Hurrengo egunak'},{es:'Histórico',eu:'Historikoa'},{es:'Predicción',eu:'Iragarpena'},
+    {es:'Día',eu:'Eguna'},{es:'Fecha',eu:'Data'},{es:'Temperatura',eu:'Tenperatura'},{es:'Temperatura (°C)',eu:'Tenperatura (°C)'},
+    {es:'Humedad',eu:'Hezetasuna'},{es:'Humedad (%)',eu:'Hezetasuna (%)'},{es:'Precipitación',eu:'Euria'},
+    {es:'Precipitación (mm)',eu:'Euria (mm)'},{es:'Lluvia (mm)',eu:'Euria (mm)'},{es:'Lluvia',eu:'Euria'},
+    {es:'Probabilidad de setas',eu:'Perretxikoen aukera'},{es:'% apar. setas',eu:'% perretxiko agerpena'},
+    {es:'Ultzama',eu:'Ultzama'},{es:'Selva de Irati',eu:'Iratiko oihana'},{es:'Selva Irati',eu:'Iratiko oihana'},{es:'Altsasu',eu:'Altsasu'},
+    {es:'Boletus gr. edulis',eu:'Ontto zuri taldea'},{es:'Cantharellus cibarius',eu:'Ziza hori'},
+    {es:'Níscalos (Lactarius gr. deliciosus)',eu:'Esne-perretxikoak (Lactarius gr. deliciosus)'},
+    {es:'Lactarius deliciosus',eu:'Esne-perretxiko'},{es:'Macrolepiota procera',eu:'Galaperna / Ziza handi'},
+    {es:'Pleurotus eryngii',eu:'Kardu-ziza'}];
 
-    // Filtros / ordenación
-    {es:'Filtrar por:', eu:'Iragazi honen arabera:'},
-    {es:'Filtrar por',  eu:'Iragazi honen arabera'},
-    {es:'Ordenar por:', eu:'Ordenatu honen arabera:'},
-    {es:'Ordenar por',  eu:'Ordenatu honen arabera'},
-    {es:'Nombre', eu:'Izena'},
-    {es:'Probabilidad', eu:'Aukera'},
-    {es:'Todas', eu:'Guztiak'},
-    {es:'Alta', eu:'Handia'},
-    {es:'Media', eu:'Ertaina'},
-    {es:'Baja', eu:'Txikia'},
+  const PARTS=[{es:'Próxima luna llena',eu:'Hurrengo ilargi betea'},{es:'Previsión para 7 días:',eu:'7 egunetarako aurreikuspena:'},
+    {es:'Suelo húmedo',eu:'Lurra hezea'},{es:'Brote tras lluvia reciente',eu:'Euri ondorengo agerpena'},
+    {es:'Temp. óptima',eu:'Tenperatura egokia'},{es:'Temperatura óptima',eu:'Tenperatura egokia'},
+    {es:'Calor alto',eu:'Bero handia'},{es:'Aire húmedo',eu:'Aire hezea'},{es:'(rocío)',eu:'(ihintza)'},
+    {es:'Aire seco',eu:'Aire lehorra'},{es:'Sequía prolongada',eu:'Lehorte luzea'},
+    {es:'Reserva hídrica alta',eu:'Ur-erreserba handia'},{es:'Reserva hídrica baja',eu:'Ur-erreserba txikia'},
+    {es:'Viento moderado',eu:'Haize ertaina'},{es:'Viento fuerte',eu:'Haize bortitza'}];
 
-    // Tabla / gráficos
-    {es:'Últimos 14 días', eu:'Azken 14 egunak'},
-    {es:'Próximos días', eu:'Hurrengo egunak'},
-    {es:'Histórico', eu:'Historikoa'},
-    {es:'Predicción', eu:'Iragarpena'},
-    {es:'Día', eu:'Eguna'},
-    {es:'Fecha', eu:'Data'},
-    {es:'Temperatura', eu:'Tenperatura'},
-    {es:'Temperatura (°C)', eu:'Tenperatura (°C)'},
-    {es:'Humedad', eu:'Hezetasuna'},
-    {es:'Humedad (%)', eu:'Hezetasuna (%)'},
-    {es:'Precipitación', eu:'Euria'},
-    {es:'Precipitación (mm)', eu:'Euria (mm)'},
-    {es:'Lluvia (mm)', eu:'Euria (mm)'},
-    {es:'Lluvia', eu:'Euria'},
-    {es:'Probabilidad de setas', eu:'Perretxikoen aukera'},
-    {es:'% apar. setas', eu:'% perretxiko agerpena'},
+  const DAYS_ABBR=[['Lun','Al'],['Mar','Ar'],['Mié','Az'],['Jue','Og'],['Vie','Or'],['Sáb','Lr'],['Dom','Ig']];
+  const MONTHS=[['enero','urtarrila'],['febrero','otsaila'],['marzo','martxoa'],['abril','apirila'],['mayo','maiatza'],['junio','ekaina'],
+                ['julio','uztaila'],['agosto','abuztua'],['septiembre','iraila'],['octubre','urria'],['noviembre','azaroa'],['diciembre','abendua']];
+  const MONTHS_SHORT=[['ene','urt'],['feb','ots'],['mar','mar'],['abr','api'],['may','mai'],['jun','eka'],
+                      ['jul','uzt'],['ago','abu'],['sept','ira'],['oct','urr'],['nov','aza'],['dic','abe']];
 
-    // Ubicaciones
-    {es:'Ultzama', eu:'Ultzama'},
-    {es:'Selva de Irati', eu:'Iratiko oihana'},
-    {es:'Selva Irati', eu:'Iratiko oihana'},
-    {es:'Altsasu', eu:'Altsasu'},
-
-    // Especies
-    {es:'Boletus gr. edulis', eu:'Ontto zuri taldea'},
-    {es:'Cantharellus cibarius', eu:'Ziza hori'},
-    {es:'Níscalos (Lactarius gr. deliciosus)', eu:'Esne-perretxikoak (Lactarius gr. deliciosus)'},
-    {es:'Lactarius deliciosus', eu:'Esne-perretxiko'},
-    {es:'Macrolepiota procera', eu:'Galaperna / Ziza handi'},
-    {es:'Pleurotus eryngii', eu:'Kardu-ziza'}
-  ];
-
-  // Fragmentos y etiquetas variables
-  const PARTS = [
-    { es:'Próxima luna llena', eu:'Hurrengo ilargi betea' },
-    { es:'Previsión para 7 días:', eu:'7 egunetarako aurreikuspena:' },
-    // Motivos del desglose
-    { es:'Suelo húmedo', eu:'Lurra hezea' },
-    { es:'Brote tras lluvia reciente', eu:'Euri ondorengo agerpena' },
-    { es:'Temp. óptima', eu:'Tenperatura egokia' },
-    { es:'Temperatura óptima', eu:'Tenperatura egokia' },
-    { es:'Calor alto', eu:'Bero handia' },
-    { es:'Aire húmedo', eu:'Aire hezea' },
-    { es:'(rocío)', eu:'(ihintza)' },
-    { es:'Aire seco', eu:'Aire lehorra' },
-    { es:'Sequía prolongada', eu:'Lehorte luzea' },
-    { es:'Reserva hídrica alta', eu:'Ur-erreserba handia' },
-    { es:'Reserva hídrica baja', eu:'Ur-erreserba txikia' },
-    { es:'Viento moderado', eu:'Haize ertaina' },
-    { es:'Viento fuerte', eu:'Haize bortitza' }
-  ];
-
-  // Días abreviados y meses — AHORA con límites de palabra para evitar "Viedenar" y "Lunta"
-  const DAYS_ABBR = [['Lun','Al'],['Mar','Ar'],['Mié','Az'],['Jue','Og'],['Vie','Or'],['Sáb','Lr'],['Dom','Ig']];
-  const MONTHS = [
-    ['enero','urtarrila'],['febrero','otsaila'],['marzo','martxoa'],['abril','apirila'],['mayo','maiatza'],['junio','ekaina'],
-    ['julio','uztaila'],['agosto','abuztua'],['septiembre','iraila'],['octubre','urria'],['noviembre','azaroa'],['diciembre','abendua']
-  ];
-  const RE_ESC = s=> s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-  const L_BOUND = '[^A-Za-zÁ-Üá-üÑñ]';
-  const repToken = (str, from, to)=> str.replace(new RegExp(`(^|${L_BOUND})(${RE_ESC(from)})(?=$|${L_BOUND})`,'g'), ($0,$1)=> $1+to);
-
-  // === Utilidades de traducción ===
-  function trExact(str, lang){
-    const s = norm(str);
+  function trExact(str,lang){
+    let s=norm(str);
+    if(s.includes('consulta los partes de setas que publican los parques')){
+      str=str.replace(/consulta los partes de setas que publican los parques/ig,'Consulta la web de:'); s=norm(str);
+    }
     for(const p of EXACT){ if(lang==='eu' && s===norm(p.es)) return p.eu; if(lang==='es' && s===norm(p.eu)) return p.es; }
     return null;
   }
-  function trFragments(str, lang){
-    let out = str || '';
-    // Frases parciales
-    for(const p of PARTS){ out = (lang==='eu') ? out.replaceAll(p.es, p.eu) : out.replaceAll(p.eu, p.es); }
-    // Días abreviados con límites
-    for(const [es,eu] of DAYS_ABBR){ out = (lang==='eu') ? repToken(out, es, eu) : repToken(out, eu, es); }
-    // Meses (minúscula/capitalizada) con límites
-    for(const [es,eu] of MONTHS){
-      const Cap = s=> s.charAt(0).toUpperCase()+s.slice(1);
-      out = (lang==='eu') ? repToken(repToken(out, es, eu), Cap(es), Cap(eu))
-                          : repToken(repToken(out, eu, es), Cap(eu), Cap(es));
+  function trFragments(str,lang){
+    let out=str||'';
+    for(const p of PARTS){ out=(lang==='eu')?out.replaceAll(p.es,p.eu):out.replaceAll(p.eu,p.es); }
+    for(const [es,eu] of DAYS_ABBR){ out=(lang==='eu')?repToken(out,es,eu):repToken(out,eu,es); }
+    const Cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
+    for(const [es,eu] of MONTHS){ out=(lang==='eu')?repToken(repToken(out,es,eu),Cap(es),Cap(eu)):repToken(repToken(out,eu,es),Cap(eu),Cap(es)); }
+    for(const [es,eu] of MONTHS_SHORT){
+      out=(lang==='eu')?repToken(out,es,eu):repToken(out,eu,es);
+      out=(lang==='eu')?repToken(out,es+'.',eu+'.'):repToken(out,eu+'.',es+'.');
     }
     return out;
   }
-
-  function translateTextNode(node, lang){
-    const raw = node.nodeValue; if(!raw || !raw.trim()) return;
-    const exact = trExact(raw.trim(), lang); if(exact!==null){ node.nodeValue = exact; return; }
-    const fr = trFragments(raw, lang); if(fr!==raw) node.nodeValue = fr;
+  function translateTextNode(node,lang){
+    const raw=node.nodeValue; if(!raw||!raw.trim()) return;
+    const exact=trExact(raw.trim(),lang); if(exact!==null){ node.nodeValue=exact; return; }
+    const fr=trFragments(raw,lang); if(fr!==raw) node.nodeValue=fr;
   }
-  function walkAndTranslate(root, lang){
-    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null); let n; while(n=w.nextNode()){
-      const tag = n.parentElement?.tagName; if(tag==='SCRIPT'||tag==='STYLE'||tag==='NOSCRIPT') continue; translateTextNode(n, lang);
+  function walkAndTranslate(root,lang){
+    const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,null); let n;
+    while(n=w.nextNode()){ const tag=n.parentElement?.tagName; if(tag==='SCRIPT'||tag==='STYLE'||tag==='NOSCRIPT') continue; translateTextNode(n,lang); }
+  }
+  function translateOptions(lang){ document.querySelectorAll('option').forEach(op=>{ const t=op.textContent.trim(); const v=trExact(t,lang); if(v!==null) op.textContent=v; }); }
+  function translateAttrs(lang){ const el=document.querySelector('#location-name'); if(el){ el.setAttribute('placeholder', lang==='eu' ? 'Idatzi lekua (adib. Aralar, Nafarroa)' : 'Escribe el lugar (ej. Aralar, Navarra)'); } }
+  function updateTitleBilingual(){
+    const t=['header h1','.app-title','#appTitle','h1'].map(s=>document.querySelector(s)).find(Boolean);
+    if(!t) return; t.innerHTML='<span class="__title-i18n"><span class="shroom">🍄</span> Zizak <span class="dash">–</span> Setas <span class="shroom">🍄</span></span>';
+  }
+
+  // Fechas: fuerzo el locale una sola vez y luego solo cambio el valor
+  if(!window.__I18N_DATE){
+    window.__I18N_DATE={ locale:(I18N.get()==='eu'?'eu-ES':'es-ES'), orig: Date.prototype.toLocaleDateString };
+    Date.prototype.toLocaleDateString = function(locale,opts){ const forced=window.__I18N_DATE?.locale||locale; return window.__I18N_DATE.orig.call(this, forced, opts); };
+  }
+  function setDateLocale(lang){ window.__I18N_DATE.locale = (lang==='eu') ? 'eu-ES' : 'es-ES'; }
+
+  function translateProbBadges(lang){
+    document.querySelectorAll('.prob-badge, .badge, .chip, .pill, [data-prob], [data-prob-label]').forEach(el=>{
+      let v=(el.getAttribute('data-prob')||el.getAttribute('data-prob-label')||el.textContent||'').trim(); if(!v) return;
+      v=v.replace(/Handia/i,'Alta').replace(/Ertaina/i,'Media').replace(/Txikia/i,'Baja');
+      const out=(lang==='eu')?v.replace(/Alta/i,'Handia').replace(/Media/i,'Ertaina').replace(/Baja/i,'Txikia'):v;
+      if(el.hasAttribute('data-prob-label')) el.setAttribute('data-prob-label', out);
+      el.textContent = out;
+    });
+  }
+
+  // Chart.js
+  function ensureChartPlugin(){
+    if(!window.Chart?.registry) return false;
+    if(!window.__chartI18NReg){
+      try{
+        const pl={ id:'i18n_mushrooms', beforeInit(ch){apply(ch)}, beforeUpdate(ch){apply(ch)} };
+        function mapStr(s,lang){ const ex=trExact(s,lang); return ex!==null?ex:trFragments(s,lang); }
+        function apply(ch){ const lang=I18N.get(); try{
+          ch.data?.datasets?.forEach(ds=>{ if(typeof ds.label==='string') ds.label = mapStr(ds.label, lang); });
+          const sc=ch.options?.scales; if(sc){ Object.values(sc).forEach(ax=>{
+            if(ax?.title?.text) ax.title.text = mapStr(ax.title.text, lang);
+            if(ax?.ticks){ const prev=ax.ticks.callback; ax.ticks.callback=function(v,i,t){ const base=prev?prev.call(this,v,i,t):(''+v); return mapStr(base, lang); }; }
+          }); }
+        }catch(e){} }
+        Chart.register(pl); window.__chartI18NReg=true;
+      }catch(e){}
+    }
+    return true;
+  }
+  function updateChartsOnce(lang){
+    if(!window.Chart) return;
+    const inst=(Chart.instances||Chart._instances||[]); const charts=Array.isArray(inst)?inst:Object.values(inst);
+    const mapStr=(s)=>{ const ex=trExact(s,lang); return ex!==null?ex:trFragments(s,lang); };
+    charts.forEach(ch=>{ try{
+      ch.data?.datasets?.forEach(ds=>{ if(typeof ds.label==='string') ds.label=mapStr(ds.label); });
+      const sc=ch.options?.scales; if(sc){ Object.values(sc).forEach(ax=>{
+        if(ax?.title?.text) ax.title.text = mapStr(ax.title.text);
+        if(ax?.ticks){ const prev=ax.ticks.callback; ax.ticks.callback=function(v,i,t){ const base=prev?prev.call(this,v,i,t):(''+v); return mapStr(base); }; }
+      }); }
+      ch.update('none');
+    }catch(e){} });
+  }
+
+  // Botón autocurativo
+  function injectButton(){
+    let host=document.getElementById('__langToggle'); if(!host){ host=document.createElement('div'); host.id='__langToggle'; document.body.appendChild(host); }
+    if(!document.getElementById('__langBtn')){
+      const b=document.createElement('button'); b.id='__langBtn'; b.type='button'; b.addEventListener('click', ()=> toggleLang());
+      host.innerHTML=''; host.appendChild(b);
+    }
+    const btn=document.getElementById('__langBtn');
+    btn.textContent = (I18N.get()==='eu' ? 'Castellano' : 'Euskara');
+  }
+
+  // Traducción total
+  function translateAll(lang){
+    if(document.documentElement.dataset.i18nLock==='1') return;
+    document.documentElement.dataset.i18nLock='1';
+    try{
+      updateTitleBilingual();
+      walkAndTranslate(document.body, lang);
+      translateOptions(lang);
+      translateAttrs(lang);
+      translateProbBadges(lang);
+      setDateLocale(lang);
+      ensureChartPlugin();
+      updateChartsOnce(lang);
+    } finally {
+      document.documentElement.dataset.i18nLock='';
     }
   }
-  function translateOptions(lang){
-    document.querySelectorAll('option').forEach(op=>{ const t=op.textContent.trim(); const v=trExact(t, lang); if(v!==null) op.textContent=v; });
-  }
-  function translateAttrs(lang){
-    const el = document.querySelector('#location-name');
-    if(el){ el.setAttribute('placeholder', lang==='eu' ? 'Idatzi lekua (adib. Aralar, Nafarroa)' : 'Escribe el lugar (ej. Aralar, Navarra)'); }
-  }
-  function updateTitleBilingual(){
-    const t=['header h1','.app-title','#appTitle','h1'].map(s=>document.querySelector(s)).find(Boolean); if(!t) return;
-    const text=' 🍄 Zizak - Setas 🌲 '; t.childNodes.forEach(n=>{ if(n.nodeType===3) n.nodeValue=text; });
-  }
-  function patchDateLocale(lang){
-    const native = Date.prototype.toLocaleDateString;
-    Date.prototype.toLocaleDateString = function(locale, opts){ const desired=(lang==='eu')?'eu-ES':'es-ES'; return native.call(this, desired, opts); };
-  }
-  function translateProbBadges(lang){
-    document.querySelectorAll('.prob-badge, .badge, .chip, .pill, [data-prob-label]').forEach(el=>{
-      let v=(el.getAttribute('data-prob-label')||el.textContent||'').trim(); if(!v) return; v=v.replace('Handia','Alta').replace('Ertaina','Media').replace('Txikia','Baja'); el.setAttribute('data-prob-label',v);
-      el.textContent = (lang==='eu') ? v.replace('Alta','Handia').replace('Media','Ertaina').replace('Baja','Txikia') : v;
-    });
-  }
 
-  // Chart.js: títulos, leyendas y ticks, usando reemplazo con límites
-  function translateCharts(lang){
-    if(!window.Chart) return;
-    const inst = (Chart.instances || Chart._instances || []);
-    const charts = Array.isArray(inst) ? inst : Object.values(inst);
-    const mapStr = (s)=>{ const ex=trExact(s,lang); return ex!==null?ex:trFragments(s,lang); };
-    charts.forEach(ch=>{
-      try{
-        ch.data?.datasets?.forEach(ds=>{ if(typeof ds.label==='string') ds.label = mapStr(ds.label); });
-        const sc = ch.options?.scales; if(sc){ Object.values(sc).forEach(ax=>{ if(ax?.title?.text) ax.title.text = mapStr(ax.title.text); if(ax?.ticks){ const prev=ax.ticks.callback; ax.ticks.callback=function(v,i,t){ const base = prev? prev.call(this,v,i,t): (''+v); return mapStr(base); }; } }); }
-        ch.update('none');
-      }catch(e){}
-    });
+  function toggleLang(){
+    const next = I18N.set(I18N.get()==='es' ? 'eu' : 'es');
+    injectButton();
+    translateAll(next);
+    // Compatibilidad con funciones internas (si existen)
+    try{ if(typeof window.translateDataStructs==='function') window.translateDataStructs(next); }catch(e){}
+    try{ if(typeof window.translateDOM==='function') window.translateDOM(next); }catch(e){}
   }
+  window.__toggleLang = toggleLang;
 
-  function applyLanguage(lang){
-    updateTitleBilingual();
-    walkAndTranslate(document.body, lang);
-    translateOptions(lang);
-    translateAttrs(lang);
-    translateProbBadges(lang);
-    patchDateLocale(lang);
-    translateCharts(lang);
-    const btn=document.getElementById('__langBtn'); if(btn) btn.textContent=(lang==='eu'?'Castellano':'Euskara');
-    setTimeout(()=>translateCharts(lang),150);
-    setTimeout(()=>translateCharts(lang),500);
-  }
-
-  document.getElementById('__langBtn')?.addEventListener('click', ()=>{
-    const next = other(getLang()); setLang(next); applyLanguage(next);
+  // Observador con throttle
+  let moTimer=null;
+  const mo=new MutationObserver(()=>{
+    if(document.documentElement.dataset.i18nLock==='1') return;
+    if(moTimer) return;
+    moTimer=setTimeout(()=>{ moTimer=null; injectButton(); translateAll(I18N.get()); }, 300);
   });
 
-  applyLanguage(getLang());
+  // Arranque
+  function boot(){ injectButton(); translateAll(I18N.get()); mo.observe(document.body,{childList:true,subtree:true}); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot, {once:true}); else boot();
 })();
 </script>
-<!-- === FIN PARCHE DE IDIOMA v3.4 === -->
+<!-- === FIN PARCHE DE IDIOMA v4.2 === -->
+
+<!-- === MINI PARCHE v4.1b: Altitud segura + etiqueta corta en gráficos === -->
+<script>
+(function(){
+  // 1) Altitud segura con timeout y caché local
+  if (!window.fetchAltitude) {
+    window.fetchAltitude = async function(lat, lon, {timeout=2500}={}) {
+      const key = `alt:${lat.toFixed(5)},${lon.toFixed(5)}`;
+      const cached = localStorage.getItem(key);
+      if (cached) return Number(cached);
+      try {
+        const ctrl = new AbortController();
+        const id = setTimeout(()=>ctrl.abort(), timeout);
+        const url = `https://api.opentopodata.org/v1/aster30m?locations=${lat},${lon}`;
+        const r = await fetch(url, {signal: ctrl.signal});
+        clearTimeout(id);
+        const j = await r.json();
+        const val = j?.results?.[0]?.elevation;
+        if (typeof val === 'number') { localStorage.setItem(key, String(val)); return val; }
+      } catch(e) { console.warn('fetchAltitude fallback', e); }
+      return null; // no bloquea la app
+    }
+  } else {
+    // Envoltorio seguro si ya existe fetchAltitude
+    const orig = window.fetchAltitude;
+    window.fetchAltitude = async function(lat, lon){
+      try {
+        const key = `alt:${lat.toFixed(5)},${lon.toFixed(5)}`;
+        const cached = localStorage.getItem(key);
+        if (cached) return Number(cached);
+        const v = await orig(lat,lon);
+        if (typeof v === 'number') localStorage.setItem(key, String(v));
+        return (typeof v === 'number') ? v : null;
+      } catch(e){ return null; }
+    }
+  }
+
+  // (opcional) helper para pintar la altitud en tarjetas si quieres llamarlo desde tu código
+  window.__showAltitude = function(el, meters){
+    if (!el) return;
+    const lang = (localStorage.getItem('app_lang')||localStorage.getItem('lang')||'es');
+    el.textContent = (meters==null)
+      ? (lang==='eu' ? '— m (ez dago daturik)' : '— m (sin datos)')
+      : `${Math.round(meters)} m`;
+  };
+
+  // 2) Etiqueta larga -> etiqueta corta (Chart.js + DOM)
+  const LONG_ES = 'Especies por día (absoluto) — línea = prob. base';
+  const LONG_EU = 'Eguneko espezieak (absolutua) — lerroa = oinarrizko prob.';
+  const SHORT_ES = 'Prob. especies';
+  const SHORT_EU = 'Prob. espezieak';
+
+  function mapShortLabel(s, lang){
+    if (!s) return s;
+    const t = String(s);
+    if (t === LONG_ES || /Especies\s+por\s+d[ií]a.*prob\.\s*base/i.test(t)) return (lang==='eu'? SHORT_EU : SHORT_ES);
+    if (t === LONG_EU || /espezieak.*oinarrizko/i.test(t)) return (lang==='eu'? SHORT_EU : SHORT_ES);
+    return t;
+  }
+
+  // Plugin Chart.js independiente que acorta/traduce la etiqueta
+  if (window.Chart && !window.__chartShortLabels){
+    const plugin = {
+      id: 'i18n_shortlabels',
+      beforeUpdate(chart){
+        const lang = localStorage.getItem('app_lang')||localStorage.getItem('lang')||'es';
+        chart.data?.datasets?.forEach(ds=>{
+          if (typeof ds.label==='string') ds.label = mapShortLabel(ds.label, lang);
+        });
+        const sc = chart.options?.scales;
+        if (sc){ Object.values(sc).forEach(ax=>{
+          if (ax?.title?.text) ax.title.text = mapShortLabel(ax.title.text, lang);
+        });}
+      }
+    };
+    Chart.register(plugin);
+    window.__chartShortLabels = true;
+  }
+
+  // También corrige el texto si aparece en el DOM fuera de Chart
+  function replaceInDom(){
+    const lang = localStorage.getItem('app_lang')||localStorage.getItem('lang')||'es';
+    const target = lang==='eu' ? SHORT_EU : SHORT_ES;
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+    let n;
+    while(n=walker.nextNode()){
+      if (!n.nodeValue) continue;
+      if (n.nodeValue.includes(LONG_ES) || n.nodeValue.includes(LONG_EU)) n.nodeValue = target;
+    }
+  }
+  document.addEventListener('DOMContentLoaded', replaceInDom, {once:true});
+  new MutationObserver(()=>{ replaceInDom(); }).observe(document.body,{childList:true,subtree:true});
+})();
+</script>
+<!-- === FIN MINI PARCHE v4.1b === -->
 
 
 
