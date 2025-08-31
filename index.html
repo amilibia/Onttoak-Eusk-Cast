@@ -183,21 +183,22 @@
         p1: "Esta aplicación estima la probabilidad de encontrar setas combinando condiciones meteorológicas recientes y un modelo heurístico ajustado a hábitats típicos del norte de Navarra.",
         how: "¿Cómo se calcula la probabilidad?",
         list: [
-          "Humedad de suelo (SMI) dependiente del tipo de suelo.",
-          "Disparadores post‑lluvia (umbra les por especie/hábitat).",
-          "Temperatura efectiva (media 3 días y corrección por altitud).",
-          "VPD (déficit de presión de vapor) en lugar de solo humedad relativa.",
-          "Penalizan: calor sostenido, viento con calor e heladas recientes.",
-          "Estacionalidad por quincenas y ajuste suave por hábitat/edad/suelo."
+          "SMI (humedad de suelo) depende del tipo de suelo: ácido≈90, básico≈70.",
+          "Disparadores post-lluvia por especie/hábitat (15/20/25 mm y ventanas 4–12 días).",
+          "Temperatura efectiva: media 3 días + corrección por altitud (−0,006 °C/m).",
+          "VPD (déficit de presión de vapor) mejor que solo HR.",
+          "Penalizaciones: calor sostenido, viento+calor, heladas recientes.",
+          "Estacionalidad por quincena y pequeños ajustes por hábitat/edad/suelo."
         ],
         speciesMode: "Modo especie",
         speciesList: [
-          "Boletus, Cantharellus, Níscalos, Lepista nuda y Hydnum repandum con pesos específicos.",
+          "Boletus, Cantharellus, Níscalos (Lactarius), Lepista nuda y Hydnum repandum con pesos específicos.",
           "Gráfico: barras apiladas por especie + línea de probabilidad base.",
           "La especie más favorecida por día se marca como chip."
         ],
         footer: "Recolecta con respeto y jamás consumas sin identificación total. Esta herramienta es orientativa. Autoría: Amilibia + Experto en Micología."
-      }
+      },
+      chart: { histTitle: "Histórico 7 días", temp: "Temp. media (°C)", rain: "Lluvia (mm)", et0: "ET0 (mm)", smi: "SMI (%)" }
     },
     eu: {
       subtitle: "Baldintzen arabera aukera orokorra eta ustezko espezieak.",
@@ -243,21 +244,22 @@
         p1: "Aplikazio honek onddoak aurkitzeko probabilitatea estimatzen du, azken eguraldi baldintzak eta Nafarroa iparraldeko habitatetara doitutako eredu heuristiko bat konbinatuta.",
         how: "Nola kalkulatzen da probabilitatea?",
         list: [
-          "Lurzoru hezetasuna (SMI) lur motaren arabera.",
-          "Euri ondoko abiarazleak (espezie/habitat araberako atalaseak).",
-          "Tenperatura eraginkorra (3 eguneko batezbestekoa eta altitude‑doikuntza).",
-          "VPD (lurrun‑presioaren defizita) HR soilik baino hobe.",
-          "Kalte: bero jarraitua, haizea + beroa eta azken izozteak.",
-          "Hamabostaldika estazionaltasuna eta habitat/adina/lur doikuntza leunak."
+          "SMI (lur hezetasuna) lur motaren arabera: azidoa≈90, oinarri-koa≈70.",
+          "Euri ondoko abiarazleak espezie/habitataren arabera (15/20/25 mm eta 4–12 egun).",
+          "Tenperatura eraginkorra: 3 egunen batezbestekoa + altitude-doikuntza (−0,006 °C/m).",
+          "VPD (lurrun-presioaren defizita) HR soilik baino fidagarriagoa.",
+          "Zigor-faktoreak: bero jarraitua, haizea+bero, azken izozteak.",
+          "Hamabostaldika estazionaltasuna eta doikuntzak habitat/adina/lurraren arabera."
         ],
         speciesMode: "Espezie modua",
         speciesList: [
-          "Boletus, Cantharellus, NisKalOak (Lactarius), Lepista nuda eta Hydnum repandum pisu espezifikoekin.",
-          "Grafikoa: espeziez apilatutako barrak + oinarri‑prob. lerroa.",
+          "Boletus, Cantharellus, Niskaloak (Lactarius), Lepista nuda eta Hydnum repandum pisu espezifikoekin.",
+          "Grafikoa: espezieka pilatutako barrak + oinarri‑prob. lerroa.",
           "Eguneko espezie onena chip gisa markatzen da."
         ],
         footer: "Bildu errespetuz eta inoiz ez kontsumitu identifikazio osoa gabe. Tresna hau orientagarria da. Egiletza: Amilibia + Mikologiako aditua."
-      }
+      },
+      chart: { histTitle: "Historiala 7 egun", temp: "Batezbest. tenp. (°C)", rain: "Euria (mm)", et0: "ET0 (mm)", smi: "SMI (%)" }
     }
   };
 
@@ -401,7 +403,7 @@
   function computeSoilMoistureIndex(rain, et0, Smax){ let S=Smax*0.5; const out=[]; for(let i=0;i<rain.length;i++){ const eff=Math.min(rain[i]||0,25)*0.8; const e=Math.max(et0[i]||0,0); S=clamp(S+eff-e,0,Smax); out.push(S/Smax);} return out; }
   function computePulseGaussian(rain, windowDays, threshold, lagMin, lagMax){ const n=rain.length, trig=new Array(n).fill(0); let last=-Infinity; for(let i=0;i<n;i++){ const sum=rain.slice(Math.max(0,i-windowDays+1), i+1).reduce((a,b)=>a+(b||0),0); if(sum>=threshold) last=i; const d=i-last; if(d>=lagMin&&d<=lagMax){ const mid=(lagMin+lagMax)/2, sigma=(lagMax-lagMin)/4; trig[i]=Math.exp(-0.5*Math.pow((d-mid)/sigma,2)); } } return trig; }
 
-  // ===== Modelo base + mejoras solicitadas
+  // ===== Modelo base + mejoras
   const HABITAT_MULTIPLIER={hayedo:1.15, robledal_atlantico:1.10, mixto_caducifolio:1.08, pinar_silvestre:1.00, carrascal:0.85};
   const AGE_MULTIPLIER={maduro:1.10, medio:1.00, joven:0.90};
   const SOIL_MULTIPLIER={acidofilo:1.10, basofilo:1.00};
@@ -412,11 +414,11 @@
   function seasonFortnightWeight(d, species){
     const x=doy(d);
     switch(species){
-      case 'boletus': return Math.max(0.2, Math.max(gauss(x, 285, 18), gauss(x, 250, 22))); // oct-primera quincena + sep tardío
-      case 'cantharellus': return Math.max(0.2, gauss(x, 240, 40)); // verano tardío-amplio
-      case 'lactarius': return Math.max(0.2, gauss(x, 300, 20)); // finales oct-nov
-      case 'lepista_nuda': return Math.max(0.2, gauss(x, 320, 25)); // nov-mediados dic
-      case 'hydnum_repandum': return Math.max(0.2, gauss(x, 295, 20)); // oct-nov
+      case 'boletus': return Math.max(0.2, Math.max(gauss(x, 285, 18), gauss(x, 250, 22))); // sept‑oct
+      case 'cantharellus': return Math.max(0.2, gauss(x, 240, 40)); // veranillo‑otoño temprano
+      case 'lactarius': return Math.max(0.2, gauss(x, 300, 20)); // finales oct‑nov
+      case 'lepista_nuda': return Math.max(0.2, gauss(x, 320, 25)); // nov‑dic
+      case 'hydnum_repandum': return Math.max(0.2, gauss(x, 295, 20)); // oct‑nov
       default: return 1.0;
     }
   }
@@ -506,29 +508,25 @@
 
   function triangleSuitability(x,[min,max]){ if(x<=min||x>=max) return 0; const mid=(min+max)/2; return x<=mid ? (x-min)/(mid-min) : (max-x)/(max-mid); }
   function smiSuitability(s,[lo,hi]){ if(s<=lo) return s/lo*0.6; if(s>=hi) return 1; const r=(s-lo)/(hi-lo); return 0.6+0.4*r; }
-
   function speciesPulseWeight(i, speciesKey, habitat, smiVal, trig15, trig20, trig25){
-    // Reglas: Boletus -> 20–25 mm; Cantharellus -> si SMI alto usar 15 mm; Lactarius -> sensible al pulso en pinar (15 mm, 4–10 d)
     if (speciesKey==='boletus') return Math.max(trig25[i], trig20[i]);
     if (speciesKey==='cantharellus') return (smiVal>=0.6? trig15[i] : trig20[i]);
     if (speciesKey==='lactarius') return (habitat==='pinar_silvestre' ? trig15[i] : Math.max(trig20[i],trig25[i]*0.7));
-    return Math.max(trig15[i]*0.6, trig20[i]*0.6); // otras especies, efecto moderado
+    return Math.max(trig15[i]*0.6, trig20[i]*0.6);
   }
 
   function computeSpeciesProbsForDay(day, i, location, ctx){
     const { tCorr3, smi, trig15, trig20, trig25 } = ctx;
     const habitat = location.habitat || '';
-    const alt = Number.isFinite(location.altitude)? location.altitude : 600;
     const T = tCorr3[i];
-    const monthIdx = new Date(day.date).getMonth(); // por si se quiere
     const raw={};
     Object.values(SPECIES).forEach(sp=>{
-      const wTemp = Math.pow(triangleSuitability(T, sp.temp), 1.15); // algo más de peso
+      const wTemp = Math.pow(triangleSuitability(T, sp.temp), 1.15);
       const wSmi  = Math.pow(smiSuitability(smi[i], sp.smi), 1.1);
       const wPulse = speciesPulseWeight(i, sp.key, habitat, smi[i], trig15, trig20, trig25);
       const wSeason = seasonFortnightWeight(day.date, sp.key);
-      const wHab = habitat && sp.key==='lactarius' && habitat==='pinar_silvestre' ? 1.10 : 1.0; // pequeño sesgo
-      const rawScore = wTemp*wSmi*(0.5 + 0.5*wPulse)*wSeason*wHab; // 0.5–1 factor por pulso
+      const wHab = habitat && sp.key==='lactarius' && habitat==='pinar_silvestre' ? 1.10 : 1.0;
+      const rawScore = wTemp*wSmi*(0.5 + 0.5*wPulse)*wSeason*wHab;
       raw[sp.key] = rawScore;
     });
     const sumRaw = Object.values(raw).reduce((a,b)=>a+b,0)||1e-6;
@@ -653,22 +651,93 @@
 
     document.getElementById('grid').appendChild(card);
 
-    // ==== Gráfico HISTÓRICO (últimos 7 previos)
-    const historyData = location.forecast.slice(Math.max(0, effectiveTodayIndex - 7), effectiveTodayIndex);
-    const dates = historyData.map(d => fmtDayMonthShort(d.date, lang));
-    const temps = historyData.map(d => d.tmed || (d.temp_min + d.temp_max)/2);
-    const rain = historyData.map(d => d.rain_for_day);
-    const et0 = historyData.map(d => d.avg_et0 || 0);
+    // ==== Gráfica HISTÓRICA (más clara: lluvia barras, temp línea, ET0 discontinua, SMI área)
+    {
+      const historyData = location.forecast.slice(Math.max(0, effectiveTodayIndex - 7), effectiveTodayIndex);
+      const dates = historyData.map(d => fmtDayMonthShort(d.date, lang));
+      const temps = historyData.map(d => d.tmed || (d.temp_min + d.temp_max)/2);
+      const rain  = historyData.map(d => d.rain_for_day);
+      const et0   = historyData.map(d => d.avg_et0 || 0);
+      const smi   = historyData.map(d => (d.smi != null ? d.smi*100 : null));
 
-    new Chart(document.getElementById(cid).getContext('2d'), {
-      type: 'line',
-      data: { labels: dates, datasets: [
-        { label: I18N[lang].temp, data: temps, borderColor: '#ef4444', tension: .25 },
-        { label: I18N[lang].rain, data: rain, borderColor: '#3b82f6', tension: .25, yAxisID: 'y1' },
-        { label: I18N[lang].et,   data: et0,  borderColor: '#10b981', tension: .25, yAxisID: 'y2' }
-      ]},
-      options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:true}}, scales:{y1:{position:'right'}, y2:{position:'right'}} }
-    });
+      new Chart(document.getElementById(cid).getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: dates,
+          datasets: [
+            { // Lluvia barras
+              type: 'bar',
+              label: I18N[lang].chart.rain,
+              data: rain,
+              backgroundColor: 'rgba(59, 130, 246, 0.35)',
+              borderColor: '#3b82f6',
+              borderWidth: 1,
+              yAxisID: 'yRain'
+            },
+            { // Temp media línea
+              type: 'line',
+              label: I18N[lang].chart.temp,
+              data: temps,
+              borderColor: '#ef4444',
+              pointRadius: 2,
+              tension: .25,
+              yAxisID: 'yTemp'
+            },
+            { // ET0 línea discontinua
+              type: 'line',
+              label: I18N[lang].chart.et0,
+              data: et0,
+              borderColor: '#10b981',
+              borderDash: [6,4],
+              pointRadius: 2,
+              tension: .25,
+              yAxisID: 'yEt0'
+            },
+            { // SMI área
+              type: 'line',
+              label: I18N[lang].chart.smi,
+              data: smi,
+              borderColor: '#06b6d4',
+              backgroundColor: 'rgba(6,182,212,0.18)',
+              fill: 'start',
+              pointRadius: 0,
+              tension: .25,
+              yAxisID: 'ySmi'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: true, position: 'top' },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const label = ctx.dataset.label || '';
+                  const v = ctx.parsed.y;
+                  if (ctx.dataset.yAxisID === 'yTemp') return `${label}: ${v.toFixed(1)} °C`;
+                  if (ctx.dataset.yAxisID === 'yRain') return `${label}: ${v.toFixed(1)} mm`;
+                  if (ctx.dataset.yAxisID === 'yEt0')  return `${label}: ${v.toFixed(1)} mm`;
+                  if (ctx.dataset.yAxisID === 'ySmi')  return `${label}: ${v.toFixed(0)} %`;
+                  return `${label}: ${v}`;
+                }
+              }
+            }
+          },
+          scales: {
+            yTemp: {
+              position: 'left',
+              grid: { drawOnChartArea: true },
+              ticks: { callback: (v)=>`${v}°` }
+            },
+            yRain: { position: 'right', grid: { drawOnChartArea: false } },
+            yEt0:  { position: 'right', grid: { drawOnChartArea: false }, display: false },
+            ySmi:  { position: 'right', grid: { drawOnChartArea: false }, offset: true, min: 0, max: 100, ticks: { callback: (v)=>`${v}%` } }
+          }
+        }
+      });
+    }
 
     // ==== Gráfico ESPECIES próximos 7 días
     const next7 = location.forecast.slice(effectiveTodayIndex, effectiveTodayIndex + 7);
@@ -846,3 +915,4 @@
 </script>
 </body>
 </html>
+
